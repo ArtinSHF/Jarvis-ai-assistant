@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>J.A.R.V.I.S — CALL MODE</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #020810;
+  --cyan:    #00e5ff;
+  --purple:  #7c4dff;
+  --green:   #00e676;
+  --yellow:  #ffd600;
+  --red:     #ff1744;
+  --dim:     rgba(0,229,255,0.15);
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+  user-select: none;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+/* scanlines */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px);
+  pointer-events: none; z-index: 999;
+}
+
+/* hex bg */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='104'%3E%3Cpath d='M30 2l28 16v32L30 66 2 50V18L30 2z' fill='none' stroke='%2300e5ff' stroke-opacity='0.03' stroke-width='0.8'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* titlebar drag region */
+#titlebar {
+  position: fixed; top:0; left:0; right:0; height:32px;
+  -webkit-app-region: drag;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 10px;
+  background: rgba(2,8,16,0.9);
+  border-bottom: 1px solid rgba(0,229,255,0.12);
+  z-index: 100;
+}
+.tb-logo {
+  font-family:'Orbitron',sans-serif;
+  font-size:9px; letter-spacing:4px; color:var(--cyan);
+  text-shadow: 0 0 8px rgba(0,229,255,0.5);
+}
+.tb-tag {
+  font-size:8px; letter-spacing:3px; color:rgba(0,229,255,0.3);
+}
+.tb-ctrl {
+  width:10px; height:10px; border-radius:50%;
+  border:none; cursor:pointer;
+  -webkit-app-region: no-drag;
+  transition: filter .15s;
+}
+.tb-ctrl:hover { filter:brightness(1.5); }
+.tb-close { background:#ff5f57; }
+
+/* main layout */
+#main {
+  position:fixed; top:32px; left:0; right:0; bottom:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:space-between;
+  padding: 14px 10px 12px;
+}
+
+/* canvas orb */
+#orbCanvas {
+  display:block;
+  flex-shrink:0;
+}
+
+/* status label */
+#statusLabel {
+  font-family:'Orbitron',sans-serif;
+  font-size:11px; letter-spacing:4px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0,229,255,0.6);
+  text-transform: uppercase;
+  min-height:16px;
+  text-align:center;
+  animation: flicker 6s ease infinite;
+}
+@keyframes flicker {
+  0%,94%,100%{opacity:1;} 95%{opacity:0.5;} 96%{opacity:1;} 97%{opacity:0.3;} 98%{opacity:1;}
+}
+
+/* last message */
+#lastMsg {
+  font-size:10px; line-height:1.6; letter-spacing:0.5px;
+  color:rgba(0,229,255,0.45);
+  text-align:center;
+  max-height:52px; overflow:hidden;
+  padding: 0 6px;
+  min-height:36px;
+}
+
+/* bottom controls */
+#controls {
+  display:flex; align-items:center; gap:10px;
+  width:100%;
+}
+
+.ctrl-btn {
+  flex:1; height:36px;
+  border:1px solid rgba(0,229,255,0.2);
+  background:rgba(0,229,255,0.03);
+  color:rgba(0,229,255,0.6);
+  font-family:'Orbitron',sans-serif;
+  font-size:8px; letter-spacing:2px;
+  cursor:pointer;
+  transition:all .2s;
+}
+.ctrl-btn:hover {
+  background:rgba(0,229,255,0.08);
+  border-color:rgba(0,229,255,0.4);
+  color:var(--cyan);
+  box-shadow:0 0 10px rgba(0,229,255,0.15);
+}
+.ctrl-btn.active {
+  border-color:var(--green);
+  color:var(--green);
+  background:rgba(0,230,118,0.06);
+}
+.ctrl-btn.exit {
+  flex:0 0 36px;
+  font-size:14px;
+  border-color:rgba(124,77,255,0.3);
+  color:rgba(124,77,255,0.6);
+}
+.ctrl-btn.exit:hover {
+  border-color:var(--purple);
+  color:var(--purple);
+  box-shadow:0 0 10px rgba(124,77,255,0.2);
+}
+
+/* mic dot indicator */
+.mic-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--green); display:inline-block;
+  margin-right:5px;
+  animation: mdot 1.2s ease infinite;
+}
+@keyframes mdot { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+</style>
+</head>
+<body>
+
+<div id="titlebar">
+  <span class="tb-logo">J.A.R.V.I.S</span>
+  <span class="tb-tag">CALL MODE</span>
+  <button class="tb-ctrl tb-close" onclick="pyCall('close_window')"></button>
+</div>
+
+<div id="main">
+  <canvas id="orbCanvas"></canvas>
+
+  <div id="statusLabel">STANDBY</div>
+
+  <div id="lastMsg">Waiting for your command, sir...</div>
+
+  <div id="controls">
+    <button class="ctrl-btn active" id="listenBtn" onclick="toggleListen()">
+      <span class="mic-dot"></span>LISTENING
+    </button>
+    <button class="ctrl-btn" id="muteBtn" onclick="toggleMute()" title="Mute/Unmute mic">🎤</button>
+    <button class="ctrl-btn exit" onclick="pyCall('exit_call_mode')" title="Back to main">⬡</button>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────
+let state       = 'standby'; // standby | listening | thinking | speaking
+let autoListen  = true;
+let isListening = false;
+
+// ── Canvas setup ───────────────────────────────────────
+const canvas = document.getElementById('orbCanvas');
+const ctx    = canvas.getContext('2d');
+const SIZE   = Math.min(window.innerWidth - 20, 240);
+canvas.width  = SIZE;
+canvas.height = SIZE;
+const CX = SIZE / 2, CY = SIZE / 2, R = SIZE * 0.38;
+
+// ── Color palettes per state ───────────────────────────
+const COLORS = {
+  standby:   { core:'rgba(0,229,255,0.06)',  ring:'rgba(0,229,255,0.5)',   particle:'#00e5ff', glow:'rgba(0,229,255,0.3)'  },
+  listening: { core:'rgba(0,230,118,0.1)',   ring:'rgba(0,230,118,0.7)',   particle:'#00e676', glow:'rgba(0,230,118,0.4)'  },
+  thinking:  { core:'rgba(255,214,0,0.07)',  ring:'rgba(255,214,0,0.55)',  particle:'#ffd600', glow:'rgba(255,214,0,0.3)'  },
+  speaking:  { core:'rgba(124,77,255,0.12)', ring:'rgba(124,77,255,0.8)',  particle:'#b39ddb', glow:'rgba(124,77,255,0.5)' },
+};
+
+// ── Rings ──────────────────────────────────────────────
+const rings = [
+  { r: R * 1.0, speed: 0.004,  tilt: 0.3,  phase: 0     },
+  { r: R * 0.8, speed:-0.007,  tilt:-0.5,  phase: 1.0   },
+  { r: R * 0.6, speed: 0.012,  tilt: 0.7,  phase: 2.0   },
+  { r: R * 0.45,speed:-0.018,  tilt:-0.3,  phase: 0.5   },
+];
+rings.forEach(rg => { rg.angle = rg.phase; });
+
+// ── Particles ──────────────────────────────────────────
+const PARTICLE_COUNT = 90;
+const particles = Array.from({length: PARTICLE_COUNT}, (_, i) => ({
+  theta:  (i / PARTICLE_COUNT) * Math.PI * 2,
+  phi:    Math.random() * Math.PI,
+  r:      R * (0.85 + Math.random() * 0.3),
+  size:   Math.random() * 1.8 + 0.5,
+  speed:  (Math.random() - 0.5) * 0.008,
+  alpha:  Math.random() * 0.5 + 0.2,
+  spike:  0,
+}));
+
+// ── Spike system ───────────────────────────────────────
+let globalSpike   = 0;   // 0–1, decays
+let spikeTarget   = 0;
+
+function triggerSpike(intensity) {
+  spikeTarget = intensity;
+}
+
+// ── Draw loop ──────────────────────────────────────────
+let frame = 0;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function draw() {
+  frame++;
+  ctx.clearRect(0, 0, SIZE, SIZE);
+
+  const col = COLORS[state] || COLORS.standby;
+
+  // Decay spike
+  globalSpike = lerp(globalSpike, spikeTarget, 0.12);
+  spikeTarget = lerp(spikeTarget, 0, 0.06);
+
+  // State-based spike auto-drive
+  if (state === 'speaking') spikeTarget = Math.max(spikeTarget, 0.5 + Math.sin(frame * 0.18) * 0.4);
+  if (state === 'listening') spikeTarget = Math.max(spikeTarget, 0.15 + Math.sin(frame * 0.09) * 0.1);
+
+  const spike = globalSpike;
+
+  // ── Deep glow background ──────────────────────────────
+  const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, R * (1.2 + spike * 0.5));
+  grad.addColorStop(0,   col.core);
+  grad.addColorStop(0.5, 'rgba(0,0,0,0)');
+  grad.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(CX, CY, R * (1.4 + spike * 0.6), 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── Outer glow ring ───────────────────────────────────
+  ctx.save();
+  ctx.shadowBlur  = 18 + spike * 40;
+  ctx.shadowColor = col.glow;
+  ctx.strokeStyle = col.ring;
+  ctx.lineWidth   = 0.5;
+  ctx.globalAlpha = 0.15 + spike * 0.25;
+  ctx.beginPath();
+  ctx.arc(CX, CY, R * (1.05 + spike * 0.15), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Spike bars around the orb ─────────────────────────
+  const BAR_COUNT = 64;
+  for (let i = 0; i < BAR_COUNT; i++) {
+    const angle = (i / BAR_COUNT) * Math.PI * 2;
+    const noise = Math.sin(angle * 3 + frame * 0.07) * 0.5
+                + Math.sin(angle * 7 - frame * 0.12) * 0.3
+                + Math.sin(angle * 13 + frame * 0.05) * 0.2;
+    const barLen = spike * R * 0.55 * ((noise + 1) / 2);
+    if (barLen < 0.5) continue;
+
+    const x1 = CX + Math.cos(angle) * R * 1.02;
+    const y1 = CY + Math.sin(angle) * R * 1.02;
+    const x2 = CX + Math.cos(angle) * (R * 1.02 + barLen);
+    const y2 = CY + Math.sin(angle) * (R * 1.02 + barLen);
+
+    ctx.save();
+    ctx.shadowBlur  = 8 + spike * 14;
+    ctx.shadowColor = col.glow;
+    ctx.strokeStyle = col.ring;
+    ctx.lineWidth   = 1.2;
+    ctx.globalAlpha = 0.55 + spike * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── 3D rings ──────────────────────────────────────────
+  rings.forEach((rg, ri) => {
+    rg.angle += rg.speed * (1 + spike * 2);
+    const pts = 120;
+    ctx.save();
+    ctx.shadowBlur  = 6 + spike * 20;
+    ctx.shadowColor = col.glow;
+    ctx.strokeStyle = col.ring;
+    ctx.lineWidth   = ri === 0 ? 1.2 : 0.7;
+    ctx.globalAlpha = (0.35 - ri * 0.05) + spike * 0.3;
+    ctx.beginPath();
+    for (let p = 0; p <= pts; p++) {
+      const a  = (p / pts) * Math.PI * 2;
+      const rx = rg.r * Math.cos(a + rg.angle);
+      const ry = rg.r * Math.sin(a + rg.angle) * Math.cos(rg.tilt) + rg.r * 0.1 * Math.sin(rg.tilt);
+      const x  = CX + rx;
+      const y  = CY + ry;
+      p === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+
+    // dot on ring
+    const dotX = CX + rg.r * Math.cos(rg.angle);
+    const dotY = CY + rg.r * Math.sin(rg.angle) * Math.cos(rg.tilt);
+    ctx.save();
+    ctx.fillStyle   = col.ring;
+    ctx.shadowBlur  = 10 + spike * 20;
+    ctx.shadowColor = col.glow;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, 2.5 + spike * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // ── Particles (spherical) ─────────────────────────────
+  particles.forEach(p => {
+    p.theta += p.speed * (1 + spike * 3);
+    p.phi   += p.speed * 0.3;
+    p.spike  = lerp(p.spike, spike, 0.15);
+
+    const pr  = p.r * (1 + p.spike * (0.4 + Math.random() * 0.3));
+    const x   = CX + pr * Math.sin(p.phi) * Math.cos(p.theta);
+    const y   = CY + pr * Math.sin(p.phi) * Math.sin(p.theta) * 0.55;
+    const depthAlpha = (Math.sin(p.phi) * 0.5 + 0.5);
+
+    ctx.save();
+    ctx.fillStyle   = col.particle;
+    ctx.globalAlpha = p.alpha * depthAlpha * (0.4 + p.spike * 0.6);
+    ctx.shadowBlur  = 4 + p.spike * 12;
+    ctx.shadowColor = col.glow;
+    ctx.beginPath();
+    ctx.arc(x, y, p.size * (1 + p.spike * 0.8), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // ── Core circle ───────────────────────────────────────
+  const coreGrad = ctx.createRadialGradient(CX - R*0.1, CY - R*0.1, 0, CX, CY, R * 0.42);
+  coreGrad.addColorStop(0,   state === 'speaking' ? 'rgba(124,77,255,0.25)'
+                           : state === 'listening' ? 'rgba(0,230,118,0.18)'
+                           : state === 'thinking'  ? 'rgba(255,214,0,0.12)'
+                           :                         'rgba(0,229,255,0.08)');
+  coreGrad.addColorStop(0.6, 'rgba(2,8,16,0.4)');
+  coreGrad.addColorStop(1,   'rgba(2,8,16,0.9)');
+
+  ctx.save();
+  ctx.shadowBlur  = 10 + spike * 25;
+  ctx.shadowColor = col.glow;
+  ctx.fillStyle   = coreGrad;
+  ctx.strokeStyle = col.ring;
+  ctx.lineWidth   = 0.8;
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(CX, CY, R * (0.42 + spike * 0.06), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.4 + spike * 0.3;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── AI text in core ───────────────────────────────────
+  ctx.save();
+  ctx.font        = `900 ${Math.round(R * 0.38)}px Orbitron, sans-serif`;
+  ctx.fillStyle   = col.ring;
+  ctx.globalAlpha = 0.22 + spike * 0.15;
+  ctx.textAlign   = 'center';
+  ctx.textBaseline= 'middle';
+  ctx.shadowBlur  = 14;
+  ctx.shadowColor = col.glow;
+  ctx.fillText('AI', CX, CY);
+  ctx.restore();
+
+  requestAnimationFrame(draw);
+}
+draw();
+
+// ── State control ──────────────────────────────────────
+const stateLabels = {
+  standby:   'STANDBY',
+  listening: 'LISTENING',
+  thinking:  'PROCESSING',
+  speaking:  'SPEAKING',
+};
+
+function setState(s) {
+  state = s;
+  document.getElementById('statusLabel').textContent = stateLabels[s] || s;
+
+  const btn = document.getElementById('listenBtn');
+  if (s === 'listening') {
+    btn.classList.add('active');
+    btn.innerHTML = '<span class="mic-dot"></span>LISTENING';
+  } else {
+    btn.classList.remove('active');
+    btn.innerHTML = autoListen ? 'AUTO LISTEN ON' : 'PUSH TO TALK';
+  }
+}
+
+function setMessage(msg) {
+  document.getElementById('lastMsg').textContent = msg;
+}
+
+// ── Called from Python ─────────────────────────────────
+function setStatus(s) {
+  const map = { LISTENING:'listening', PROCESSING:'thinking', SPEAKING:'speaking', ONLINE:'standby' };
+  setState(map[s] || 'standby');
+  if (s === 'SPEAKING') triggerSpike(0.85);
+  if (s === 'LISTENING') triggerSpike(0.25);
+}
+
+function addMessage(role, text) {
+  if (role !== 'user') {
+    setMessage(text.length > 120 ? text.slice(0, 117) + '...' : text);
+  }
+}
+
+function setListening(val) {
+  isListening = val === 'true';
+}
+
+// ── Python API ─────────────────────────────────────────
+function pyCall(method, ...args) {
+  if (window.pywebview && window.pywebview.api) {
+    return window.pywebview.api[method](...args);
+  }
+}
+
+// ── Auto listen loop ───────────────────────────────────
+let isMuted = false;
+
+function toggleMute() {
+  isMuted = !isMuted;
+  const btn = document.getElementById('muteBtn');
+  if (isMuted) {
+    btn.textContent = '🔇';
+    btn.style.borderColor = 'rgba(255,23,68,0.5)';
+    btn.style.color       = 'rgba(255,23,68,0.8)';
+    btn.style.background  = 'rgba(255,23,68,0.06)';
+    setState('standby');
+  } else {
+    btn.textContent = '🎤';
+    btn.style.borderColor = '';
+    btn.style.color       = '';
+    btn.style.background  = '';
+  }
+}
+
+function toggleListen() {
+  if (isListening) return;
+  pyCall('start_listening');
+}
+
+// Auto-restart listening after JARVIS finishes speaking
+let prevState = 'standby';
+setInterval(() => {
+  if (prevState === 'speaking' && state === 'standby' && autoListen && !isListening && !isMuted) {
+    setTimeout(() => pyCall('start_listening'), 600);
+  }
+  prevState = state;
+}, 300);
+
+// Start listening immediately on load
+window.addEventListener('pywebviewready', () => {
+  setTimeout(() => { if (!isMuted) pyCall('start_listening'); }, 1200);
+});
+</script>
+</body>
+</html>

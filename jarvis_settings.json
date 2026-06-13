@@ -1,0 +1,20 @@
+{
+  "gemini_api_key": "-",
+  "gemini_model": "gemini-3.1-flash-lite-preview",
+  "steam_api_key": "-",
+  "steam_user_id": "-",
+  "spotify_client_id": "-",
+  "spotify_client_secret": "-",
+  "voice": "en-GB-RyanNeural",
+  "briefing_hour": 8,
+  "briefing_minute": 0,
+  "username": "sir",
+  "clap_threshold": 4500,
+  "screen_awareness": true,
+  "personality_mode": "normal",
+  "notif_enabled": true,
+  "notif_whitelist": "discord,steam,whatsapp,telegram,gmail,outlook,spotify",
+  "screen_check_interval": 15,
+  "screen_react_prob": 0.75,
+  "screen_react_gap": 35
+}

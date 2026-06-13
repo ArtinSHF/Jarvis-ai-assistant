@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#020810">
+<title>J.A.R.V.I.S</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{--bg:#020810;--cyan:#00e5ff;--purple:#7c4dff;--green:#00e676;--yellow:#ffd600;--red:#ff1744;--border:rgba(0,229,255,0.18);--text:#90a4ae;--text-hi:#e0f7fa;}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='104'%3E%3Cpath d='M30 2l28 16v32L30 66 2 50V18L30 2z' fill='none' stroke='%2300e5ff' stroke-opacity='0.03' stroke-width='0.8'/%3E%3C/svg%3E");pointer-events:none;}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);pointer-events:none;z-index:999;}
+
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;z-index:10;transition:opacity 0.35s ease;gap:10px;}
+.screen.hidden{opacity:0;pointer-events:none;}
+
+.logo-big{font-family:'Orbitron',sans-serif;font-size:26px;font-weight:900;letter-spacing:8px;color:var(--cyan);text-shadow:0 0 20px rgba(0,229,255,0.6);text-align:center;animation:flicker 5s ease infinite;}
+@keyframes flicker{0%,94%,100%{opacity:1;}95%{opacity:.5;}96%{opacity:1;}97%{opacity:.3;}}
+.sub{font-size:8px;letter-spacing:4px;color:rgba(0,229,255,0.3);text-transform:uppercase;text-align:center;}
+.scard{width:100%;max-width:360px;padding:14px 18px;border:1px solid var(--border);background:rgba(0,229,255,0.02);display:flex;align-items:center;gap:10px;}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--yellow);box-shadow:0 0 8px var(--yellow);flex-shrink:0;animation:sdot 1s ease infinite;}
+.sdot.on{background:var(--green);box-shadow:0 0 8px var(--green);animation:none;}
+.sdot.off{background:var(--red);box-shadow:0 0 8px var(--red);animation:none;}
+@keyframes sdot{0%,100%{opacity:1;}50%{opacity:.3;}}
+.stext{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2px;color:var(--text-hi);}
+.fl{font-size:8px;letter-spacing:3px;color:rgba(0,229,255,0.3);text-transform:uppercase;width:100%;max-width:360px;}
+.fi{width:100%;max-width:360px;background:rgba(0,229,255,0.03);border:1px solid rgba(0,229,255,0.16);color:var(--text-hi);font-family:'Share Tech Mono',monospace;font-size:14px;padding:11px 14px;outline:none;-webkit-appearance:none;letter-spacing:.5px;}
+.fi:focus{border-color:rgba(0,229,255,0.45);}
+.btn{width:100%;max-width:360px;height:48px;border:1px solid rgba(0,229,255,0.3);background:rgba(0,229,255,0.05);color:var(--cyan);font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;cursor:pointer;outline:none;-webkit-appearance:none;transition:all .15s;}
+.btn:active{background:rgba(0,229,255,0.1);transform:scale(.98);}
+.btn.grn{border-color:rgba(0,230,118,0.35);background:rgba(0,230,118,0.05);color:var(--green);}
+.btn.ylw{border-color:rgba(255,214,0,0.35);background:rgba(255,214,0,0.05);color:var(--yellow);}
+#connectErr{font-size:9px;letter-spacing:2px;color:rgba(255,23,68,0.7);text-align:center;min-height:16px;max-width:360px;line-height:1.5;}
+
+/* MAIN */
+#mainScreen{padding:0;justify-content:flex-start;}
+#titlebar{width:100%;height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(2,8,16,0.96);border-bottom:1px solid var(--border);flex-shrink:0;}
+.tb-logo{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:900;letter-spacing:4px;color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,0.5);}
+.tb-right{display:flex;align-items:center;gap:8px;}
+.tb-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);}
+.tb-dot.off{background:var(--red);box-shadow:0 0 6px var(--red);}
+#connLabel{font-size:8px;letter-spacing:2px;color:rgba(0,229,255,0.35);}
+.wave-wrap{display:flex;align-items:flex-end;gap:2px;height:18px;}
+.wbar{width:3px;border-radius:2px 2px 0 0;background:var(--cyan);opacity:.15;min-height:2px;}
+.wbar.active{opacity:.7;animation:wv var(--dur,.4s) ease-in-out infinite alternate;}
+@keyframes wv{from{height:15%;}to{height:100%;}}
+#statusBar{width:100%;padding:6px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(0,229,255,0.05);flex-shrink:0;}
+#statusMain{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--cyan);text-shadow:0 0 8px rgba(0,229,255,0.4);}
+#sessInfo{font-size:8px;letter-spacing:1px;color:rgba(0,229,255,0.25);}
+#speakPill{display:none;font-size:8px;letter-spacing:2px;padding:2px 8px;border:1px solid rgba(124,77,255,0.4);color:rgba(124,77,255,0.8);background:rgba(124,77,255,0.06);animation:pill .8s ease-in-out infinite alternate;}
+@keyframes pill{from{opacity:.6;}to{opacity:1;}}
+#orbWrap{width:100%;display:flex;justify-content:center;padding:10px 0 2px;flex-shrink:0;}
+#chat{flex:1;width:100%;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:7px;padding:8px 12px;-webkit-overflow-scrolling:touch;}
+.msg{max-width:90%;padding:8px 12px;font-size:11px;line-height:1.65;animation:msgin .2s ease-out;}
+@keyframes msgin{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+.msg-user{align-self:flex-end;background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.18);border-right:3px solid var(--cyan);color:var(--text-hi);}
+.msg-jarvis{align-self:flex-start;background:rgba(124,77,255,0.04);border:1px solid rgba(124,77,255,0.15);border-left:3px solid var(--purple);color:var(--text-hi);}
+.msg-system{align-self:center;border:1px solid rgba(255,214,0,0.1);color:rgba(255,214,0,0.4);font-size:8px;letter-spacing:2px;text-transform:uppercase;padding:4px 10px;}
+.msg-who{font-size:7px;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;opacity:.5;}
+.msg-user .msg-who{color:var(--cyan);text-align:right;}
+.msg-jarvis .msg-who{color:var(--purple);}
+#chips{width:100%;padding:6px 10px;display:flex;gap:6px;overflow-x:auto;border-top:1px solid rgba(0,229,255,0.05);flex-shrink:0;scrollbar-width:none;}
+#chips::-webkit-scrollbar{display:none;}
+.chip{flex-shrink:0;padding:5px 10px;border:1px solid rgba(0,229,255,0.12);background:rgba(0,229,255,0.02);color:rgba(0,229,255,0.45);font-size:10px;letter-spacing:1px;cursor:pointer;white-space:nowrap;-webkit-appearance:none;transition:all .15s;}
+.chip:active{background:rgba(0,229,255,0.08);color:var(--cyan);}
+.chip.ylw{border-color:rgba(255,214,0,0.2);color:rgba(255,214,0,0.5);}
+.chip.pur{border-color:rgba(124,77,255,0.3);color:rgba(124,77,255,0.6);}
+.chip.red{border-color:rgba(255,23,68,0.18);color:rgba(255,23,68,0.5);}
+.chip.grn{border-color:rgba(0,230,118,0.3);color:rgba(0,230,118,0.6);}
+#inputbar{width:100%;padding:9px 12px;display:flex;align-items:center;gap:7px;border-top:1px solid var(--border);background:rgba(2,8,16,0.92);flex-shrink:0;padding-bottom:max(9px,env(safe-area-inset-bottom));}
+#textbox{flex:1;background:transparent;border:none;outline:none;color:var(--text-hi);font-family:'Share Tech Mono',monospace;font-size:14px;caret-color:var(--cyan);-webkit-appearance:none;}
+#textbox::placeholder{color:rgba(0,229,255,0.18);font-size:11px;letter-spacing:1px;}
+.icon-btn{width:44px;height:44px;border-radius:50%;border:1px solid rgba(0,229,255,0.3);background:rgba(0,229,255,0.04);color:var(--cyan);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;outline:none;-webkit-appearance:none;transition:all .15s;}
+.icon-btn:active{background:rgba(0,229,255,0.1);transform:scale(.92);}
+.icon-btn.listening{border-color:var(--green);color:var(--green);background:rgba(0,230,118,0.07);animation:mpulse 1s ease-in-out infinite;}
+@keyframes mpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,.4);}50%{box-shadow:0 0 0 7px rgba(0,230,118,0);}}
+.send-btn{height:44px;padding:0 14px;border:1px solid rgba(0,229,255,0.22);background:rgba(0,229,255,0.05);color:var(--cyan);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;cursor:pointer;outline:none;-webkit-appearance:none;flex-shrink:0;}
+.send-btn:active{background:rgba(0,229,255,0.1);}
+
+/* CALL MODE */
+#callMode{position:fixed;inset:0;z-index:500;background:rgba(2,8,16,0.97);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:32px 20px 40px;}
+#callMode.hidden{display:none !important;}
+.call-logo{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:5px;color:var(--cyan);text-shadow:0 0 10px rgba(0,229,255,0.5);}
+.call-status{font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:4px;color:var(--cyan);text-shadow:0 0 12px rgba(0,229,255,0.6);min-height:18px;text-align:center;}
+.call-msg{font-size:11px;line-height:1.7;color:rgba(0,229,255,0.4);text-align:center;max-width:280px;min-height:44px;}
+.call-btn-row{display:flex;gap:14px;align-items:center;}
+.call-action{width:64px;height:64px;border-radius:50%;border:2px solid rgba(0,229,255,0.35);background:rgba(0,229,255,0.06);color:var(--cyan);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;outline:none;-webkit-appearance:none;transition:all .18s;}
+.call-action:active{transform:scale(.92);}
+.call-action.listening{border-color:var(--green);color:var(--green);background:rgba(0,230,118,0.08);animation:cpulse 1.1s ease-in-out infinite;}
+.call-action.muted{border-color:var(--red);color:var(--red);background:rgba(255,23,68,0.07);}
+.call-action.exit{border-color:rgba(124,77,255,0.4);color:var(--purple);}
+@keyframes cpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,.4);}50%{box-shadow:0 0 0 12px rgba(0,230,118,0);}}
+.call-rings-wrap{position:relative;width:200px;height:200px;display:flex;align-items:center;justify-content:center;}
+
+/* SCREEN VIEWER */
+#screenViewer{position:fixed;inset:0;z-index:600;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;}
+#screenViewer.hidden{display:none !important;}
+#screenViewerBar{width:100%;height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(2,8,16,0.97);border-bottom:1px solid var(--border);flex-shrink:0;}
+#screenViewerTitle{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--cyan);}
+#screenViewerFps{font-size:8px;letter-spacing:2px;color:rgba(0,229,255,0.3);}
+#screenViewerClose{height:30px;padding:0 12px;border:1px solid rgba(255,87,87,0.4);background:none;color:rgba(255,87,87,0.7);font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;cursor:pointer;outline:none;-webkit-appearance:none;}
+#screenImg{flex:1;width:100%;object-fit:contain;display:block;background:#000;}
+#screenViewerErr{position:absolute;bottom:60px;font-size:9px;letter-spacing:2px;color:rgba(255,23,68,0.6);text-align:center;padding:6px 14px;display:none;}
+
+/* MOBILE SETTINGS — personality grid */
+.mp-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
+.mp-btn{padding:9px 4px;border:1px solid rgba(0,229,255,0.15);background:rgba(0,229,255,0.02);color:rgba(0,229,255,0.38);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;text-align:center;outline:none;-webkit-appearance:none;transition:all .15s;}
+.mp-btn:active{transform:scale(.97);}
+.mp-btn.active{border-color:var(--cyan);background:rgba(0,229,255,0.1);color:var(--cyan);}
+.mp-btn.active.professional{border-color:var(--purple);background:rgba(124,77,255,0.1);color:var(--purple);}
+.mp-btn.active.casual{border-color:var(--green);background:rgba(0,230,118,0.08);color:var(--green);}
+.mp-btn.active.unhinged{border-color:var(--red);background:rgba(255,23,68,0.08);color:var(--red);}
+
+/* mobile toggle */
+.m-toggle-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;}
+.m-toggle{position:relative;width:42px;height:22px;cursor:pointer;flex-shrink:0;}
+.m-toggle input{opacity:0;width:0;height:0;}
+.m-toggle-track{position:absolute;inset:0;background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.2);border-radius:22px;transition:.25s;}
+.m-toggle input:checked + .m-toggle-track{background:rgba(0,229,255,0.18);border-color:var(--cyan);box-shadow:0 0 6px rgba(0,229,255,0.4);}
+.m-toggle-thumb{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:rgba(0,229,255,0.4);transition:.25s;}
+.m-toggle input:checked ~ .m-toggle-thumb{transform:translateX(20px);background:var(--cyan);box-shadow:0 0 6px var(--cyan);}
+</style>
+</head>
+<body>
+
+<!-- CONNECT SCREEN -->
+<div class="screen" id="connectScreen">
+  <div class="logo-big">J.A.R.V.I.S</div>
+  <div class="sub">Remote Mirror v4</div>
+  <div class="scard"><div class="sdot" id="sdot"></div><div class="stext" id="stext">CHECKING PC...</div></div>
+  <div class="fl">PC / TAILSCALE IP</div>
+  <input class="fi" id="ipInput" type="text" placeholder="100.x.x.x or 192.168.1.x" inputmode="url" autocomplete="off">
+  <div class="fl">TOKEN</div>
+  <input class="fi" id="tokenInput" type="text" placeholder="jarvis" autocomplete="off">
+  <button class="btn" onclick="connect()">⬡ CONNECT — SUMMON JARVIS ON PC</button>
+  <button class="btn ylw" id="unlockBtn" onclick="unlockPC()" style="display:none;">🔓 UNLOCK PC SCREEN</button>
+  <button class="btn grn" id="wakeBtn"   onclick="wakePC()"   style="display:none;">⚡ WAKE PC FROM SLEEP</button>
+  <div id="connectErr"></div>
+  <div class="sub" style="line-height:2.2;">Tailscale = anywhere · Local IP = same WiFi</div>
+</div>
+
+<!-- MAIN SCREEN -->
+<div class="screen hidden" id="mainScreen">
+  <div id="titlebar">
+    <span class="tb-logo">J.A.R.V.I.S</span>
+    <div class="tb-right">
+      <div class="tb-dot" id="connDot"></div>
+      <span id="connLabel">MIRROR ACTIVE</span>
+      <div class="wave-wrap" id="waveBars"></div>
+    </div>
+  </div>
+  <div id="statusBar">
+    <div id="statusMain">ONLINE</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div id="speakPill">🔊 SPEAKING</div>
+      <div id="sessInfo">REMOTE MIRROR</div>
+    </div>
+  </div>
+  <div id="orbWrap"><canvas id="orbCanvas"></canvas></div>
+  <div id="chat"></div>
+  <div id="chips">
+    <div class="chip pur" onclick="openCallMode()">📞 CALL MODE</div>
+    <div class="chip grn" onclick="openScreenViewer()">🖥 VIEW SCREEN</div>
+    <div class="chip" onclick="qc('Open YouTube')">▶ YouTube</div>
+    <div class="chip" onclick="qc('Open Spotify')">♫ Spotify</div>
+    <div class="chip" onclick="qc('Play music for my vibe')">🎵 Vibe Music</div>
+    <div class="chip" onclick="qc('Read that')">👁 Read Screen</div>
+    <div class="chip" onclick="qc('Translate the screen')">🌐 Translate</div>
+    <div class="chip" onclick="qc('What is the weather in Hillerod')">☁ Weather</div>
+    <div class="chip" onclick="qc('How is my PC doing')">💻 Stats</div>
+    <div class="chip" onclick="qc('Who is online on Steam')">🎮 Friends</div>
+    <div class="chip" onclick="qc('Read my notes')">📋 Notes</div>
+    <div class="chip" onclick="qc('Give me a daily briefing')">📰 Briefing</div>
+    <div class="chip" onclick="openMobileSettings()">⚙ Settings</div>
+    <div class="chip ylw" onclick="unlockPC()">🔓 Unlock</div>
+    <div class="chip red" onclick="disconnect()">✕ Disconnect</div>
+  </div>
+  <div id="inputbar">
+    <input id="textbox" type="text" placeholder="TYPE — EXECUTES ON PC..."
+           onkeydown="onKey(event)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <button class="icon-btn" id="micBtn" onclick="toggleMic()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+    </button>
+    <button class="send-btn" onclick="sendText()">SEND</button>
+  </div>
+</div>
+
+<!-- CALL MODE -->
+<div id="callMode" class="hidden">
+  <div class="call-logo">J.A.R.V.I.S · CALL MODE</div>
+  <div class="call-rings-wrap"><canvas id="callCanvas"></canvas></div>
+  <div class="call-status" id="callStatus">STANDBY</div>
+  <div class="call-msg" id="callMsg">Tap mic to speak. JARVIS will respond on both devices.</div>
+  <div class="call-btn-row">
+    <button class="call-action" id="callMicBtn" onclick="callToggleMic()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+    </button>
+    <button class="call-action muted" id="callMuteBtn" onclick="callToggleMute()" title="Mute phone audio">🔊</button>
+    <button class="call-action exit" onclick="closeCallMode()">⬡</button>
+  </div>
+</div>
+
+<!-- SCREEN VIEWER -->
+<div id="screenViewer" class="hidden">
+  <div id="screenViewerBar">
+    <div id="screenViewerTitle">🖥 PC LIVE VIEW</div>
+    <div id="screenViewerFps">-- FPS</div>
+    <button id="screenViewerClose" onclick="closeScreenViewer()">✕ CLOSE</button>
+  </div>
+  <img id="screenImg" src="" alt="PC Screen" draggable="false">
+  <div id="screenViewerErr">⚠ Could not load frame</div>
+</div>
+
+<script>
+const LS={get:k=>localStorage.getItem(k),set:(k,v)=>localStorage.setItem(k,v)};
+const savedIP=LS.get('jarvis_ip')||'';const savedToken=LS.get('jarvis_token')||'jarvis';
+if(savedIP) document.getElementById('ipInput').value=savedIP;
+document.getElementById('tokenInput').value=savedToken;
+
+let socket=null,state='standby',isListening=false,reconnecting=false;
+let callModeOpen=false,callMuted=false;
+const t0=Date.now();
+
+// Screen Viewer
+let _screenViewerActive=false,_screenLoopId=null,_fpsCount=0,_fpsTimer=0;
+function openScreenViewer(){
+  const ip=LS.get('jarvis_ip');const token=LS.get('jarvis_token')||'jarvis';
+  if(!ip) return;
+  _screenViewerActive=true;
+  document.getElementById('screenViewer').classList.remove('hidden');
+  _screenViewerLoop(ip,token);
+}
+function closeScreenViewer(){
+  _screenViewerActive=false;
+  document.getElementById('screenViewer').classList.add('hidden');
+  if(_screenLoopId) clearTimeout(_screenLoopId);
+}
+function _screenViewerLoop(ip,token){
+  if(!_screenViewerActive) return;
+  const img=document.getElementById('screenImg');
+  const errEl=document.getElementById('screenViewerErr');
+  const fpsEl=document.getElementById('screenViewerFps');
+  const url=`http://${ip}:5000/screenshot?token=${encodeURIComponent(token)}&_=${Date.now()}`;
+  img.onload=()=>{
+    errEl.style.display='none';
+    const now=Date.now();_fpsCount++;
+    if(now-_fpsTimer>=1000){fpsEl.textContent=_fpsCount+' FPS';_fpsCount=0;_fpsTimer=now;}
+    if(_screenViewerActive) _screenLoopId=setTimeout(()=>_screenViewerLoop(ip,token),200);
+  };
+  img.onerror=()=>{errEl.style.display='block';if(_screenViewerActive) _screenLoopId=setTimeout(()=>_screenViewerLoop(ip,token),1000);};
+  img.src=url;
+}
+
+// Audio Engine
+const AudioContext=window.AudioContext||window.webkitAudioContext;
+let audioCtx=null;
+function getAudioCtx(){if(!audioCtx) audioCtx=new AudioContext();if(audioCtx.state==='suspended') audioCtx.resume();return audioCtx;}
+function unlockAudio(){try{const ctx=getAudioCtx();const buf=ctx.createBuffer(1,1,22050);const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);src.start(0);}catch(e){}}
+document.addEventListener('touchstart',unlockAudio,{once:true});
+document.addEventListener('click',unlockAudio,{once:true});
+async function playBase64Audio(b64){
+  if(callMuted) return;
+  try{
+    const ctx=getAudioCtx();const bytes=atob(b64);const buf=new Uint8Array(bytes.length);
+    for(let i=0;i<bytes.length;i++) buf[i]=bytes.charCodeAt(i);
+    const decoded=await ctx.decodeAudioData(buf.buffer);
+    const src=ctx.createBufferSource();src.buffer=decoded;src.connect(ctx.destination);src.start(0);
+    const pill=document.getElementById('speakPill');if(pill) pill.style.display='block';
+    if(callModeOpen) setCallStatus('SPEAKING');
+    src.onended=()=>{if(pill) pill.style.display='none';if(callModeOpen) setCallStatus('STANDBY');};
+  }catch(e){console.error('Audio play error:',e);}
+}
+
+// Wave bars
+const wb=document.getElementById('waveBars');const bars=[];
+for(let i=0;i<12;i++){const b=document.createElement('div');b.className='wbar';b.style.height=(Math.random()*25+5)+'%';wb.appendChild(b);bars.push(b);}
+setInterval(()=>{bars.forEach(b=>{if(!b.classList.contains('active')) b.style.height=(Math.random()*22+5)+'%';});},200);
+
+// Canvas Orb
+function makeOrb(id,size){
+  const cv=document.getElementById(id);if(!cv)return{setState:()=>{},spike:()=>{}};
+  cv.width=size;cv.height=size;
+  const cx=cv.getContext('2d');const CX=size/2,CY=size/2,R=size*.44;const N=120;
+  const pts=Array.from({length:N},()=>({theta:Math.random()*Math.PI*2,phi:Math.random()*Math.PI,speed:.005+Math.random()*.01,r:R*(.8+Math.random()*.35),size:1+Math.random()*1.5,alpha:.2+Math.random()*.5,spike:0}));
+  let _state='standby',sT=0,gS=0;
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const cols={standby:{ring:'rgba(0,229,255,0.7)',core:'rgba(0,229,255,0.22)',glow:'rgba(0,229,255,0.6)'},listening:{ring:'rgba(0,230,118,0.8)',core:'rgba(0,230,118,0.25)',glow:'rgba(0,230,118,0.7)'},thinking:{ring:'rgba(255,214,0,0.8)',core:'rgba(255,214,0,0.2)',glow:'rgba(255,214,0,0.6)'},speaking:{ring:'rgba(124,77,255,0.8)',core:'rgba(124,77,255,0.25)',glow:'rgba(124,77,255,0.7)'}};
+  function draw(){
+    cx.clearRect(0,0,size,size);const col=cols[_state]||cols.standby;
+    const sp=sT;sT=lerp(sT,0,.04);gS=lerp(gS,sp,.1);
+    pts.forEach(p=>{p.theta+=p.speed*(1+gS*3);p.phi+=p.speed*.3;p.spike=lerp(p.spike,gS,.15);const pr=p.r*(1+p.spike*.35);cx.save();cx.fillStyle=col.ring;cx.globalAlpha=p.alpha*(Math.sin(p.phi)*.5+.5)*(.4+p.spike*.5);cx.shadowBlur=4+p.spike*10;cx.shadowColor=col.glow;cx.beginPath();cx.arc(CX+pr*Math.sin(p.phi)*Math.cos(p.theta),CY+pr*Math.sin(p.phi)*Math.sin(p.theta)*.55,p.size*(1+p.spike*.7),0,Math.PI*2);cx.fill();cx.restore();});
+    const cg=cx.createRadialGradient(CX-R*.1,CY-R*.1,0,CX,CY,R*.4);cg.addColorStop(0,col.core);cg.addColorStop(1,'rgba(2,8,16,0.9)');cx.save();cx.shadowBlur=10+sp*22;cx.shadowColor=col.glow;cx.fillStyle=cg;cx.strokeStyle=col.ring;cx.lineWidth=.8;cx.beginPath();cx.arc(CX,CY,R*.4,0,Math.PI*2);cx.fill();cx.globalAlpha=.45+sp*.3;cx.stroke();cx.restore();
+    cx.save();cx.font=`900 ${Math.round(R*.34)}px Orbitron,sans-serif`;cx.fillStyle=col.ring;cx.globalAlpha=.22+sp*.12;cx.textAlign='center';cx.textBaseline='middle';cx.shadowBlur=12;cx.shadowColor=col.glow;cx.fillText('AI',CX,CY);cx.restore();
+    requestAnimationFrame(draw);
+  }
+  draw();
+  return{setState(s){_state=s;},spike(v){sT=Math.max(sT,v);}};
+}
+const mainOrb=makeOrb('orbCanvas',190);
+const callOrb=makeOrb('callCanvas',200);
+
+// PC Check
+let checkTimer=null;
+async function checkPC(ip){
+  const dot=document.getElementById('sdot'),txt=document.getElementById('stext');
+  try{const r=await fetch(`http://${ip}:5000/ping`,{signal:AbortSignal.timeout(3000)});const d=await r.json();if(d.status==='online'){dot.className='sdot on';txt.textContent='PC ONLINE — READY';document.getElementById('wakeBtn').style.display='none';document.getElementById('unlockBtn').style.display='block';return true;}}
+  catch(e){dot.className='sdot off';txt.textContent='PC OFFLINE / SLEEPING';document.getElementById('wakeBtn').style.display='block';document.getElementById('unlockBtn').style.display='none';}
+  return false;
+}
+function startChecking(){clearInterval(checkTimer);const ip=document.getElementById('ipInput').value.trim();if(!ip)return;checkPC(ip);checkTimer=setInterval(()=>checkPC(document.getElementById('ipInput').value.trim()),5000);}
+document.getElementById('ipInput').addEventListener('input',()=>startChecking());
+startChecking();
+
+async function unlockPC(){
+  const ip=document.getElementById('ipInput').value.trim()||LS.get('jarvis_ip');
+  const token=document.getElementById('tokenInput').value.trim()||LS.get('jarvis_token')||'jarvis';
+  if(!ip) return;
+  showErr('Sending unlock — PIN will type in background...','rgba(0,229,255,.5)');
+  try{const r=await fetch(`http://${ip}:5000/unlock`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token}),signal:AbortSignal.timeout(6000)});const d=await r.json();if(d.status==='unlocked')showErr('✓ Unlock sent! Windows is typing your PIN.','rgba(0,230,118,.8)');else showErr(`Error: ${d.error}`,'rgba(255,23,68,.7)');}
+  catch(e){showErr('Could not reach PC','rgba(255,214,0,.7)');}
+}
+
+function wakePC(){let mac=LS.get('jarvis_mac')||'';if(!mac){mac=prompt('Enter PC MAC address\nFormat: AA:BB:CC:DD:EE:FF');if(!mac)return;LS.set('jarvis_mac',mac);}showErr('WOL sent. Wait 10-15s then CONNECT','rgba(0,230,118,.7)');setTimeout(()=>startChecking(),10000);}
+
+function connect(){
+  const ip=document.getElementById('ipInput').value.trim();
+  const token=document.getElementById('tokenInput').value.trim()||'jarvis';
+  if(!ip){showErr('Enter your PC IP address','rgba(255,23,68,.7)');return;}
+  LS.set('jarvis_ip',ip);LS.set('jarvis_token',token);
+  unlockAudio();
+  showErr('Connecting — JARVIS will open on PC...','rgba(0,229,255,.5)');
+  socket=io(`http://${ip}:5000`,{query:{token},transports:['websocket','polling'],reconnectionAttempts:15,reconnectionDelay:2000,timeout:8000});
+  socket.on('connect',()=>{clearInterval(checkTimer);showMain();});
+  socket.on('connect_error',()=>{showErr('Connection failed. Is JARVIS running?','rgba(255,23,68,.7)');socket=null;});
+  socket.on('disconnect',()=>{document.getElementById('connDot').className='tb-dot off';document.getElementById('connLabel').textContent='DISCONNECTED';addMsg('system','Connection lost — reconnecting...');reconnecting=true;});
+  socket.on('reconnect',()=>{document.getElementById('connDot').className='tb-dot';document.getElementById('connLabel').textContent='MIRROR ACTIVE';addMsg('system','Reconnected, sir.');reconnecting=false;});
+  socket.on('addMessage',d=>addMsg(d.role,d.text));
+  socket.on('setStatus',d=>updateStatus(d.status));
+  socket.on('setListening',d=>updateListening(d.value==='true'));
+  socket.on('speakAudio',d=>{
+    if(d.audio) playBase64Audio(d.audio);
+    if(callModeOpen){setCallStatus('SPEAKING');document.getElementById('callMsg').textContent=d.text||'';}
+  });
+  socket.on('speakText',d=>{if(callModeOpen) document.getElementById('callMsg').textContent=d.text||'';});
+}
+
+function disconnect(){if(socket){socket.disconnect();socket=null;}closeScreenViewer();document.getElementById('mainScreen').classList.add('hidden');document.getElementById('connectScreen').classList.remove('hidden');callModeOpen=false;document.getElementById('callMode').classList.add('hidden');startChecking();}
+function showMain(){document.getElementById('connectScreen').classList.add('hidden');document.getElementById('mainScreen').classList.remove('hidden');addMsg('jarvis','Remote mirror active, sir. PC JARVIS is now open. Voice plays on both devices simultaneously.');}
+function showErr(msg,color='rgba(255,23,68,.7)'){const el=document.getElementById('connectErr');el.textContent=msg;el.style.color=color;}
+
+const stateMap={ONLINE:'standby',LISTENING:'listening',PROCESSING:'thinking',SPEAKING:'speaking'};
+const stateLabels={standby:'ONLINE',listening:'LISTENING',thinking:'PROCESSING',speaking:'SPEAKING'};
+function updateStatus(s){
+  state=stateMap[s]||'standby';
+  document.getElementById('statusMain').textContent=stateLabels[state]||s;
+  mainOrb.setState(state);
+  if(callModeOpen) setCallStatus(stateLabels[state]||s);
+  if(state==='speaking') mainOrb.spike(.9);
+  if(state==='listening') mainOrb.spike(.3);
+  bars.forEach(b=>{if(state==='listening'){b.style.setProperty('--dur',(0.3+Math.random()*.4).toFixed(2)+'s');b.classList.add('active');}else b.classList.remove('active');});
+}
+function updateListening(val){
+  isListening=val;
+  const btn=document.getElementById('micBtn');
+  val?btn.classList.add('listening'):btn.classList.remove('listening');
+  if(callModeOpen){const cb=document.getElementById('callMicBtn');val?cb.classList.add('listening'):cb.classList.remove('listening');if(val) setCallStatus('LISTENING');}
+}
+
+function addMsg(role,text){
+  const chat=document.getElementById('chat');
+  const el=document.createElement('div');el.className='msg msg-'+role;
+  if(role!=='system'){const who=document.createElement('div');who.className='msg-who';who.textContent=role==='user'?'▶ YOU':'◀ J.A.R.V.I.S';el.appendChild(who);}
+  const body=document.createElement('div');body.textContent=text;el.appendChild(body);
+  chat.appendChild(el);chat.scrollTop=chat.scrollHeight;
+}
+
+function sendText(){const box=document.getElementById('textbox');const txt=box.value.trim();if(!txt||!socket)return;box.value='';socket.emit('command',{text:txt});addMsg('user',txt);}
+function qc(cmd){if(!socket)return;socket.emit('command',{text:cmd});addMsg('user',cmd);}
+function onKey(e){if(e.key==='Enter')sendText();}
+function toggleMic(){if(!socket||isListening)return;socket.emit('listen',{});}
+
+function openCallMode(){callModeOpen=true;document.getElementById('callMode').classList.remove('hidden');document.getElementById('mainScreen').classList.add('hidden');setCallStatus('STANDBY');callOrb.setState('standby');}
+function closeCallMode(){callModeOpen=false;document.getElementById('callMode').classList.add('hidden');document.getElementById('mainScreen').classList.remove('hidden');}
+function setCallStatus(s){
+  document.getElementById('callStatus').textContent=s;
+  const stMap={STANDBY:'standby',LISTENING:'listening',PROCESSING:'thinking',SPEAKING:'speaking',ONLINE:'standby'};
+  const cs=stMap[s]||'standby';callOrb.setState(cs);
+  if(cs==='speaking') callOrb.spike(.9);if(cs==='listening') callOrb.spike(.3);
+}
+function callToggleMic(){if(!socket||isListening)return;socket.emit('listen',{});setCallStatus('LISTENING');}
+function callToggleMute(){callMuted=!callMuted;const btn=document.getElementById('callMuteBtn');btn.textContent=callMuted?'🔇':'🔊';btn.style.borderColor=callMuted?'rgba(255,23,68,0.5)':'rgba(124,77,255,0.4)';btn.style.color=callMuted?'var(--red)':'rgba(124,77,255,0.8)';}
+
+setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);const mm=String(Math.floor(s/60)).padStart(2,'0');const ss=String(s%60).padStart(2,'0');document.getElementById('sessInfo').textContent=`${reconnecting?'RECONNECTING':'MIRROR'} · ${mm}:${ss}`;},1000);
+window.addEventListener('online',()=>{if(socket)socket.connect();});
+</script>
+
+<!-- MOBILE SETTINGS MODAL — full parity with desktop (Updates 3, 5, 7) -->
+<div id="mobileSettingsModal" style="display:none;position:fixed;inset:0;z-index:900;background:rgba(2,8,16,0.97);overflow-y:auto;padding:20px;box-sizing:border-box;">
+  <div style="max-width:480px;margin:0 auto;border:1px solid rgba(0,229,255,0.18);padding:22px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:4px;color:#00e5ff;">⚙ SETTINGS</div>
+      <button onclick="closeMobileSettings()" style="background:none;border:1px solid rgba(255,87,87,0.4);color:rgba(255,87,87,0.7);padding:5px 14px;cursor:pointer;font-size:10px;letter-spacing:2px;">✕ CLOSE</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <div class="ms"><div class="ml">GEMINI API KEY</div><input class="mi" id="ms_gemini" type="password" placeholder="AIza..."></div>
+      <div class="ms"><div class="ml">GEMINI MODEL</div>
+        <select class="mi" id="ms_model">
+          <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite Preview (Default)</option>
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+          <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+          <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
+        </select>
+      </div>
+      <div class="ms"><div class="ml">VOICE</div>
+        <select class="mi" id="ms_voice">
+          <option value="en-GB-RyanNeural">Ryan — British Male (Default)</option>
+          <option value="en-GB-SoniaNeural">Sonia — British Female</option>
+          <option value="en-US-GuyNeural">Guy — American Male</option>
+          <option value="en-US-AriaNeural">Aria — American Female</option>
+          <option value="en-AU-WilliamNeural">William — Australian Male</option>
+        </select>
+      </div>
+
+      <!-- Update 7: Screen Watcher Tuning -->
+      <div style="border:1px solid rgba(0,229,255,0.08);padding:12px;">
+        <div class="ml" style="margin-bottom:10px;">👁 SCREEN WATCHER TUNING <span style="opacity:.4;font-size:7px;">(NEVER RESET)</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="ms"><div class="ml">CHECK INTERVAL (seconds)</div><input class="mi" id="ms_sw_interval" type="number" min="5" max="120" placeholder="15"></div>
+          <div class="ms"><div class="ml">REACTION PROBABILITY (0.0–1.0)</div><input class="mi" id="ms_sw_prob" type="number" min="0" max="1" step="0.05" placeholder="0.75"></div>
+          <div class="ms"><div class="ml">MIN REACTION GAP (seconds)</div><input class="mi" id="ms_sw_gap" type="number" min="5" max="300" placeholder="35"></div>
+        </div>
+      </div>
+
+      <!-- Update 3: Notification Reader -->
+      <div style="border:1px solid rgba(0,229,255,0.08);padding:12px;">
+        <div class="m-toggle-row" style="margin-bottom:10px;">
+          <div class="ml">🔔 NOTIFICATION READER</div>
+          <label class="m-toggle">
+            <input type="checkbox" id="ms_notif" checked>
+            <div class="m-toggle-track"></div>
+            <div class="m-toggle-thumb"></div>
+          </label>
+        </div>
+        <div class="ms"><div class="ml">APP WHITELIST (comma-separated)</div><input class="mi" id="ms_notif_list" placeholder="discord,steam,whatsapp"></div>
+      </div>
+
+      <!-- Update 5: Personality Mode -->
+      <div style="border:1px solid rgba(0,229,255,0.08);padding:12px;">
+        <div class="ml">🎭 PERSONALITY MODE</div>
+        <div class="mp-grid">
+          <button class="mp-btn active" data-mode="normal"       onclick="mSelectPersonality('normal')">NORMAL</button>
+          <button class="mp-btn"        data-mode="professional" onclick="mSelectPersonality('professional')">PROFESSIONAL</button>
+          <button class="mp-btn"        data-mode="casual"       onclick="mSelectPersonality('casual')">CASUAL</button>
+          <button class="mp-btn"        data-mode="unhinged"     onclick="mSelectPersonality('unhinged')">UNHINGED</button>
+        </div>
+        <div style="font-size:8px;color:rgba(0,229,255,0.2);margin-top:8px;line-height:1.7;">
+          NORMAL = baseline · PROFESSIONAL = butler · CASUAL = chill friend · UNHINGED = chaos
+        </div>
+      </div>
+
+    </div>
+
+    <button onclick="saveMobileSettings()" style="width:100%;height:44px;margin-top:20px;background:rgba(0,229,255,0.05);border:1px solid rgba(0,229,255,0.3);color:#00e5ff;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;cursor:pointer;">SAVE SETTINGS</button>
+    <div id="ms_status" style="margin-top:10px;font-size:9px;letter-spacing:2px;text-align:center;min-height:14px;"></div>
+  </div>
+</div>
+
+<style>
+.ms{display:flex;flex-direction:column;gap:5px;}
+.ml{font-size:8px;letter-spacing:3px;color:rgba(0,229,255,0.35);text-transform:uppercase;}
+.mi{background:rgba(0,229,255,0.02);border:1px solid rgba(0,229,255,0.14);color:#e0f7fa;font-family:'Share Tech Mono',monospace;font-size:11px;padding:9px 10px;outline:none;width:100%;box-sizing:border-box;}
+.mi:focus{border-color:rgba(0,229,255,0.38);}
+.mi option{background:#020810;}
+</style>
+
+<script>
+function mSetPersonalityBtn(mode){
+  document.querySelectorAll('.mp-btn').forEach(btn=>{btn.classList.remove('active','normal','professional','casual','unhinged');});
+  const active=document.querySelector(`.mp-btn[data-mode="${mode}"]`);
+  if(active) active.classList.add('active',mode);
+}
+function mSelectPersonality(mode){ mSetPersonalityBtn(mode); }
+
+function openMobileSettings(){
+  const ip=LS.get('jarvis_ip');
+  if(!ip){showErr('Connect to JARVIS first','rgba(255,23,68,.7)');return;}
+  fetch(`http://${ip}:5000/get_settings`)
+    .then(r=>r.json())
+    .then(s=>{
+      document.getElementById('ms_gemini').value    = s.gemini_api_key || '';
+      document.getElementById('ms_model').value     = s.gemini_model   || 'gemini-3.1-flash-lite-preview';
+      document.getElementById('ms_voice').value     = s.voice          || 'en-GB-RyanNeural';
+      // Update 7
+      document.getElementById('ms_sw_interval').value = s.screen_check_interval ?? 15;
+      document.getElementById('ms_sw_prob').value     = s.screen_react_prob     ?? 0.75;
+      document.getElementById('ms_sw_gap').value      = s.screen_react_gap      ?? 35;
+      // Update 3
+      document.getElementById('ms_notif').checked      = s.notif_enabled !== false;
+      document.getElementById('ms_notif_list').value   = s.notif_whitelist || 'discord,steam,whatsapp,telegram,gmail,outlook,spotify';
+      // Update 5
+      mSetPersonalityBtn(s.personality_mode || 'normal');
+      document.getElementById('mobileSettingsModal').style.display='block';
+    })
+    .catch(()=>showErr('Could not load settings from PC','rgba(255,23,68,.7)'));
+}
+
+function closeMobileSettings(){
+  document.getElementById('mobileSettingsModal').style.display='none';
+}
+
+function saveMobileSettings(){
+  const ip=LS.get('jarvis_ip');
+  if(!ip){showErr('Not connected','rgba(255,23,68,.7)');return;}
+  const data={
+    gemini_api_key: document.getElementById('ms_gemini').value.trim(),
+    gemini_model:   document.getElementById('ms_model').value,
+    voice:          document.getElementById('ms_voice').value,
+    // Update 7
+    screen_check_interval: parseFloat(document.getElementById('ms_sw_interval').value)||15,
+    screen_react_prob:     parseFloat(document.getElementById('ms_sw_prob').value)||0.75,
+    screen_react_gap:      parseFloat(document.getElementById('ms_sw_gap').value)||35,
+    // Update 3
+    notif_enabled:   document.getElementById('ms_notif').checked,
+    notif_whitelist: document.getElementById('ms_notif_list').value.trim(),
+    // Update 5
+    personality_mode: document.querySelector('.mp-btn.active')?.dataset?.mode||'normal',
+  };
+  fetch(`http://${ip}:5000/save_settings`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(data)
+  })
+  .then(r=>r.json())
+  .then(res=>{
+    const el=document.getElementById('ms_status');
+    if(res.ok){el.style.color='rgba(0,230,118,0.8)';el.textContent='✓ SAVED — APPLIED IMMEDIATELY';}
+    else{el.style.color='rgba(255,23,68,0.8)';el.textContent='✗ SAVE FAILED';}
+    setTimeout(()=>{el.textContent='';},3000);
+  })
+  .catch(()=>{
+    const el=document.getElementById('ms_status');
+    el.style.color='rgba(255,23,68,0.8)';el.textContent='✗ CONNECTION ERROR';
+    setTimeout(()=>{el.textContent='';},3000);
+  });
+}
+</script>
+</body>
+</html>
