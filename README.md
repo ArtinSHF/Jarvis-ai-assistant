@@ -2,13 +2,15 @@
 
 > *Just A Rather Very Intelligent System* — a fully custom AI desktop assistant built from scratch with Python, Google Gemini, a cyberpunk UI, voice I/O, screen awareness, mobile mirroring, and autonomous task execution.
 
+<img width="1917" height="1012" alt="screenshot 1" src="https://github.com/user-attachments/assets/0ff19a31-6546-4f8b-a4a1-e460a0cfb4e2" />
+
 ---
 
 ## What Is This?
 
 JARVIS is a personal AI assistant I built entirely from scratch as an ongoing solo project. It runs as a cyberpunk desktop interface, listens for voice input, watches the screen in the background, reads notifications aloud, controls apps and music, mirrors itself to a phone, and can autonomously execute large multi-step coding or file tasks — all without touching a single third-party assistant framework.
 
-Every subsystem — the brain, the voice pipeline, the mobile server, the agent engine, the screen watcher, the settings manager — was designed and written by me.
+Every subsystem — the brain, the voice pipeline, the mobile server, the agent engine, the screen watcher, the settings manager, the installer, and the auto-updater — was designed and written by me.
 
 This is not a wrapper around an existing assistant. It is a ground-up implementation.
 
@@ -33,6 +35,13 @@ This section exists for anyone evaluating this project from a technical or hirin
 - Wrote a Windows notification reader that copies a locked SQLite database (`wpndatabase.db`) to a temp path to bypass Windows exclusive file locks, queries it, and filters results
 - Implemented Wake-on-LAN magic packet sending from scratch using raw UDP sockets
 
+### Distribution & Packaging
+- Bundled a self-contained embedded Python 3.11 environment so the app runs on any Windows PC with zero prerequisites
+- Built a compiled `JARVIS.exe` launcher using PyInstaller that finds and boots the embedded Python — no system Python required
+- Wrote a complete Inno Setup installer script that handles install path selection, desktop shortcuts, Start Menu entries, optional Windows startup registration, and an uninstaller with AppData cleanup prompt
+- Migrated all user settings and API keys to `%APPDATA%\JARVIS\` so they survive every install, update, and reinstall without ever being wiped
+- Built a GitHub Releases auto-updater that checks for new versions on every launch, downloads only the code zip (~50–100KB), extracts in-memory, and restarts JARVIS automatically — users never manually update
+
 ### Audio & Voice
 - Integrated `SpeechRecognition` with `PyAudio` for microphone-based voice input with ambient noise adjustment
 - Built a double-clap detection system using RMS spike analysis on a live audio stream via `PyAudio`
@@ -48,8 +57,9 @@ This section exists for anyone evaluating this project from a technical or hirin
 - Built a fullscreen agent mode overlay with live step logging and animated status indicators
 
 ### Security & Settings Architecture
-- Designed a settings system with a startup reset on every launch and a `PROTECTED_KEYS` frozenset so API keys and calibration values survive the reset
-- Removed all secrets from source code — credentials load from `settings.json` which is gitignored
+- Designed a settings system with a `PROTECTED_KEYS` frozenset — API keys and user calibration values never get overwritten on update or restart
+- Non-destructive startup reset: only adds new default keys introduced by updates, never touches existing user config
+- Removed all secrets from source code — credentials load from `%APPDATA%\JARVIS\jarvis_settings.json` which is gitignored
 - Implemented token-based auth on all server endpoints and SocketIO connections
 
 ### Windows Integration
@@ -143,22 +153,24 @@ This section exists for anyone evaluating this project from a technical or hirin
 ## 🏗 Architecture Overview
 
 ```
-jarvis.py          — Entry point, pywebview window, startup reset
-brain.py           — Gemini, TTS queue, command execution, session memory
-server.py          — Flask-SocketIO mobile mirror, screenshot, WOL, auth
-task_executor.py   — Autonomous agent engine, JSON planner, step execution
-clap_listener.py   — Double-clap detection via RMS/spike analysis
-screen_watcher.py  — Background screen capture, Gemini Vision reactions
+jarvis.py                — Entry point, pywebview window, startup reset
+brain.py                 — Gemini, TTS queue, command execution, session memory
+server.py                — Flask-SocketIO mobile mirror, screenshot, WOL, auth
+task_executor.py         — Autonomous agent engine, JSON planner, step execution
+clap_listener.py         — Double-clap detection via RMS/spike analysis
+screen_watcher.py        — Background screen capture, Gemini Vision reactions
 notification_listener.py — Windows notification DB polling and reader
-reminder_engine.py — Timers, reminders, daily briefing
-spotify_helper.py  — Spotify URI control and API search
-settings.py        — Settings manager, PROTECTED_KEYS, startup reset
-notes.py           — JSON note system
-sfx.py             — Windows Beep sound effects
-index.html         — Desktop cyberpunk UI
-mobile.html        — Mobile companion UI
-call_mode.html     — Floating call mode window
-startup.vbs        — Headless Windows startup launcher
+reminder_engine.py       — Timers, reminders, daily briefing
+spotify_helper.py        — Spotify URI control and API search
+settings.py              — Settings manager, PROTECTED_KEYS, AppData migration
+updater.py               — GitHub Releases auto-updater
+notes.py                 — JSON note system
+sfx.py                   — Windows Beep sound effects
+index.html               — Desktop cyberpunk UI
+mobile.html              — Mobile companion UI
+call_mode.html           — Floating call mode window
+startup.vbs              — Headless Windows startup launcher
+version.txt              — Current version number (read by auto-updater)
 ```
 
 ---
@@ -179,17 +191,30 @@ JARVIS can:
 
 ## 🚀 Installation
 
-### Requirements
+### Option A — Installer (recommended, no Python needed)
+
+1. Download `JARVIS_Setup.exe` from the output folder
+2. Run it and follow the wizard — pick your install folder, optionally add a desktop shortcut and Windows startup
+3. Launch JARVIS and go to **Settings** to enter your API keys
+4. Done — JARVIS will auto-update itself from GitHub on every launch
+
+All settings and API keys are stored in `%APPDATA%\JARVIS\` and survive every update and reinstall.
+
+---
+
+### Option B — Run from source
+
+#### Requirements
 - Windows 11
 - Python 3.11
 
-### 1. Clone the repo
+#### 1. Clone the repo
 ```bash
-git clone https://github.com/yourusername/jarvis.git
+git clone https://github.com/ArtinSHF/Jarvis-AI-Assistant.git
 cd jarvis
 ```
 
-### 2. Install dependencies
+#### 2. Install dependencies
 ```bash
 py -3.11 -m pip install -r requirements.txt
 ```
@@ -200,9 +225,8 @@ pip install pipwin
 pipwin install pyaudio
 ```
 
-### 3. Configure your API keys
-
-Copy the example settings file and fill in your keys:
+#### 3. Configure your API keys
+Copy the example settings file:
 ```bash
 copy jarvis_settings.example.json jarvis_settings.json
 ```
@@ -212,17 +236,12 @@ Then edit `jarvis_settings.json` and add:
 - `spotify_client_id` / `spotify_client_secret` — [Spotify Developer Dashboard](https://developer.spotify.com)
 - `steam_api_key` / `steam_user_id` — [Steam API Key](https://steamcommunity.com/dev/apikey)
 
-### 4. Run
+#### 4. Run
 ```bash
 py -3.11 jarvis.py
 ```
 
-Or use the included launcher:
-```bash
-START_JARVIS.bat
-```
-
-### 5. (Optional) Auto-startup
+#### 5. (Optional) Auto-startup
 Run `SETUP_STARTUP.bat` once to install the headless startup launcher. JARVIS will boot silently with Windows and wait for a double-clap or phone connection.
 
 ---
@@ -237,7 +256,7 @@ Run `SETUP_STARTUP.bat` once to install the headless startup launcher. JARVIS wi
    ```
 4. The mobile UI will connect automatically
 
-Make sure Windows Firewall is not blocking port 5000.
+> Make sure Windows Firewall is not blocking port 5000.
 
 ---
 
@@ -251,6 +270,14 @@ Make sure Windows Firewall is not blocking port 5000.
 
 ---
 
+## 🔄 Auto-Updates
+
+JARVIS checks GitHub Releases on every launch. If a newer version is available it downloads just the code (~50–100KB), installs it silently in the background, and restarts. No reinstall, no manual steps.
+
+API keys and all settings are stored in `%APPDATA%\JARVIS\` and are never touched by updates.
+
+---
+
 ## 🔧 Troubleshooting
 
 **Voice not working** — check microphone permissions in Windows settings, check `pyaudio` is installed correctly
@@ -259,7 +286,9 @@ Make sure Windows Firewall is not blocking port 5000.
 
 **Mobile mirror not connecting** — check firewall rules for port 5000, check both devices are on the same network or Tailscale, try opening the server URL in the phone browser directly
 
-**Startup not working** — run `py -3.11 jarvis.py` manually first to check for errors, verify all dependencies are installed, verify API keys are saved in `jarvis_settings.json`
+**JARVIS not starting** — run `debug_launch.bat` to see the full error output. Check `%APPDATA%\JARVIS\jarvis.log` for crash details
+
+**Auto-updater not working** — check `%APPDATA%\JARVIS\updater.log` to see exactly what the updater did and where it stopped
 
 **Notifications not appearing** — check the notification whitelist in settings includes your app names, check that `notif_enabled` is `true`
 
@@ -267,7 +296,7 @@ Make sure Windows Firewall is not blocking port 5000.
 
 ## 📌 Project Status
 
-Actively developed. Core features are stable. Some subsystems (agent mode, screen watcher tuning) are still being refined.
+Actively developed. Core features are stable. Distributed as a standalone Windows installer with automatic updates via GitHub Releases.
 
 ---
 
